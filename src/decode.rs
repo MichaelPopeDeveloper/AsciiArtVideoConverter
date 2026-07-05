@@ -20,7 +20,7 @@ fn rgb_frame_to_image(frame: &Video, w: u32, h: u32) -> RgbImage {
 
 pub fn decode<F: FnMut(RgbImage)>(path: &str, mut on_frame: F) -> anyhow::Result<()> {
     ffmpeg::init()?;
-    let mut ictx = input(&path)?;
+    let mut ictx = input(&path).expect("Failed to open input file");
     let stream = ictx
         .streams()
         .best(ffmpeg::media::Type::Video)
@@ -28,15 +28,15 @@ pub fn decode<F: FnMut(RgbImage)>(path: &str, mut on_frame: F) -> anyhow::Result
 
     let stream_idx = stream.index();
 
-    let ctx = ffmpeg::codec::context::Context::from_parameters(stream.parameters())?;
-    let mut decoder = ctx.decoder().video()?;
+    let ctx = ffmpeg::codec::context::Context::from_parameters(stream.parameters()).expect("Failed to create codec context");
+    let mut decoder = ctx.decoder().video().expect("Failed to create video decoder");
     let (w, h) = (decoder.width(), decoder.height());
 
     let mut scaler = Context::get(
         decoder.format(), w, h,
         Pixel::RGB24, w, h,
         Flags::BILINEAR,
-    )?;
+    ).expect("Failed to create scaler");
 
     for (s, packet) in ictx.packets() {
         if s.index() != stream_idx {
@@ -46,7 +46,7 @@ pub fn decode<F: FnMut(RgbImage)>(path: &str, mut on_frame: F) -> anyhow::Result
         let mut frame = Video::empty();
         while decoder.receive_frame(&mut frame).is_ok() {
             let mut rgb = Video::new(Pixel::RGB24, w, h);
-            scaler.run(&frame, &mut rgb)?;
+            scaler.run(&frame, &mut rgb).expect("Failed to scale frame");
             on_frame(rgb_frame_to_image(&rgb, w, h));
         }
     }
@@ -54,7 +54,7 @@ pub fn decode<F: FnMut(RgbImage)>(path: &str, mut on_frame: F) -> anyhow::Result
     let mut frame = Video::empty();
     while decoder.receive_frame(&mut frame).is_ok() {
         let mut rgb = Video::empty();
-        scaler.run(&frame, &mut rgb)?;
+        scaler.run(&frame, &mut rgb).expect("Failed to scale frame");
         on_frame(rgb_frame_to_image(&rgb, w, h));
     }
     Ok(())

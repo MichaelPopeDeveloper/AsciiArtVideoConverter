@@ -1,5 +1,5 @@
-use std::io::{stdout, Write};
-use std::time::{Duration, Instant};
+use std::io::{ stdout, Write };
+use std::time::{ Duration, Instant };
 use crate::ascii::frame_to_ascii;
 use crate::decode::decode;
 
